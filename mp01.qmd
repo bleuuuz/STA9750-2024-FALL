@@ -160,11 +160,15 @@ USAGE <- USAGE |>
 if(!require("DT")) install.packages("DT")
 library(DT)
 
+
+
+```
+
+```{r echo=TRUE, message=FALSE}
+
 sample_n(USAGE, 1000) |> 
   mutate(month=as.character(month)) |> 
   DT::datatable()
-
-
 ```
 
 **1) MTA New York City Transit is the most traveled US transit system in terms of Vehicle Revenue Miles.**
