@@ -473,23 +473,17 @@ Next we can work on visualizing our new data set to get a clear view of movie pr
   ungroup() |>
   arrange(decade, rank) 
 
-#This code creates a graph visualization of our data set
-decade_success_visual <- ggplot(decade_success, aes(x = decade, y = quantity, color = genres, group = genres)) +
-  geom_line(linewidth = .5) + 
-  geom_point(size = 1.5) +
-  labs(
-    title = "Genres Popularity Across Decades",
-    x = "Decade",
-    y = "Number of Successful Movies",
-    color = "Genres"
-  ) +
-  scale_x_continuous(breaks = seq(min(decade_success$decade), max(decade_success$decade), by = 10)) + 
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    legend.position = "bottom"
-  )
+library(randomcoloR)
+n <- 20
+palette <- distinctColorPalette(n)
 
-ggplotly(decade_success_visual)
+
+#This code creates a graph visualization of our data set
+ggplot(decade_success, aes(x = decade, y = quantity, fill = genres)) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(title = "Successful Movies by Decade and Genre", x = "Decade", y = "Quantity", fill = "Genre") +
+  scale_fill_manual(values = distinctColorPalette(n)) +
+  theme_minimal()
 ```
 
 **4.2: What genre consistently has the most “successes”? What genre used to reliably produce “successes” and has fallen out of favor?**
