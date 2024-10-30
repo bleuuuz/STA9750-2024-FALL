@@ -479,11 +479,12 @@ palette <- distinctColorPalette(n)
 
 
 #This code creates a graph visualization of our data set
-ggplot(decade_success, aes(x = decade, y = quantity, fill = genres)) +
+decade_success_graph<-ggplot(decade_success, aes(x = decade, y = quantity, fill = genres)) +
   geom_bar(stat = "identity", position = "stack") +
   labs(title = "Successful Movies by Decade and Genre", x = "Decade", y = "Quantity", fill = "Genre") +
   scale_fill_manual(values = distinctColorPalette(n)) +
   theme_minimal()
+decade_success_graph
 ```
 
 **4.2: What genre consistently has the most “successes”? What genre used to reliably produce “successes” and has fallen out of favor?**
