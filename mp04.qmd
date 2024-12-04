@@ -1,7 +1,6 @@
 ---
 title: "Using Monte Carlo to Help CUNY Professors Retire"
 editor: visual
-author: "Bleuuuz"
 ---
 
 # Abstract
@@ -142,17 +141,34 @@ Now that we've outlined our parameters for this investigation, we will be using 
 ```{r message=FALSE,warning=FALSE}
 #| code-fold: true
 
-#Setting up our API keys 
-alphavantagedata <- function(symbol, api_key) {
-  # Construct the API URL
-  url <- paste0(
-    "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=",
-    symbol,
-    "&apikey=", api_key,
-    "&datatype=json"
-  )
+#Setting up our API keys
+alphavantagekey <- readLines('alphaapikey.txt')
+FREDkey <- readLines('FREDapikey.txt')
+```
+
+Now that our API's are set up, we can pull data for the following...
+
+**From AlphaVantage:**
+
+1\) [VTI-Vanguard Total Stock Market ETF](https://investor.vanguard.com/investment-products/etfs/profile/vti)
+
+2\) [VEU-Vanguard FTSE All-World ex-US Index Fund](https://investor.vanguard.com/investment-products/etfs/profile/veu)
+
+```{r message=FALSE,warning=FALSE}
+#| code-fold: true
+
+#Alphavantage Download Function
+alphavantagedata <- function(symbol, 
+                              
+                             api_key) {
+  #API URL
+  url <- paste0("https://www.alphavantage.co/query?function=TIME_SERIES_DAILY", 
+                "&symbol=", 
+                symbol, 
+                "&apikey=", api_key, 
+                "&outputsize=full&datatype=json")
   
-  # Make the API request
+  # API request
   response <- request(url) |> req_perform()
   
   # Parse the JSON response
@@ -172,13 +188,31 @@ alphavantagedata <- function(symbol, api_key) {
   # Return the dataframe
   return(df)
 }
+
+
+#VTI_Data <- alphavantagedata("VTI",alphavantagekey)
+#VEU_Data <- alphavantagedata("VEU",alphavantagekey)
+
 ```
 
+**From FRED:**
+
+1\) Wage Growth
+
+2\) CPI Inflation Metrics
+
+3\) Ten-Year Bond Returns
+
+4\) Two-Year Debt Returns
+
 ```{r message=FALSE,warning=FALSE}
+#| code-fold: true
+
+
 #FRED Data Pull Function
 fred_data_pull <- function(series_id, api_key) {
   
-  # Construct the URL for the API request
+  # URL for the API request
   url <- paste0("https://api.stlouisfed.org/fred/series/observations?series_id=", 
                 series_id, 
                 "&api_key=", api_key, 
@@ -201,33 +235,7 @@ fred_data_pull <- function(series_id, api_key) {
   return(df)
 }
 
-```
 
-**From AlphaVantage we need historical price charts for:**
-
-1\) [VTI-Vanguard Total Stock Market ETF](https://investor.vanguard.com/investment-products/etfs/profile/vti)
-
-2\) [VEU-Vanguard FTSE All-World ex-US Index Fund](https://investor.vanguard.com/investment-products/etfs/profile/veu)
-
-```{r message=FALSE,warning=FALSE}
-#| code-fold: true
-VTI_Data <- alpha_stock_data("VTI",alphavantagekey)
-VEU_Data <- alpha_stock_data("VEU",alphavantagekey)
-
-```
-
-**And from FRED we need:**
-
-1\) Wage Growth
-
-2\) Inflation Metrics
-
-3\) Bond Market Total Returns
-
-4\) Short-Term Debt Returns
-
-```{r message=FALSE,warning=FALSE}
-#| code-fold: true
 Wagegrowthdata <- fred_data_pull("CES0500000003", FREDkey) |>
   rename(wage_growth_rate = value) 
   
@@ -249,3 +257,5 @@ twoyeardata <- fred_data_pull('DTB3', FREDkey) |>
   select(date, short_term_rate)
   
 ```
+
+## Investigating Correlations

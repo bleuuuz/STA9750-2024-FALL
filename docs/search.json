@@ -95,7 +95,7 @@
     "href": "mp04.html#contribution-schedule",
     "title": "Using Monte Carlo to Help CUNY Professors Retire",
     "section": "Contribution Schedule",
-    "text": "Contribution Schedule\nUnder the TRS plan, employees pay a fixed percentage of their paycheck based on the following salary schedules:\n\n\nCode\nlibrary(tidyverse)\nlibrary(dplyr)\nlibrary(ggplot2)\nlibrary(DT)\nlibrary(sf)\nlibrary(jsonlite)\nlibrary(httr2)\n\n#| code-fold: true\nTRSSalarySchedule &lt;- data.frame(\n  Salary_Range = c(\n    \"$45,000 or less\",\n    \"$45,001 to $55,000\",\n    \"$55,001 to $75,000\",\n    \"$75,001 to $100,000\",\n    \"$100,001 or more\"\n  ),\n  Contribution_Rate = c(\"3%\", \"3.5%\", \"4.5%\", \"5.75%\", \"6%\")\n)\n\ndatatable(setNames(TRSSalarySchedule, c(\"Salary Range\", \"Contribution Rate\")), caption = \"TRS Contribution Schedule\")\n\n\n\n\n\n\nIn this case, if a professor makes ~$60,000 a year, they can expect to contribute ~$2,700 yearly towards their TRS plan. As a professor continues receiving pay jumps, the amount they contribute towards their TRS increases and becomes a determining factor in how much their retirement benefit will be."
+    "text": "Contribution Schedule\nUnder the TRS plan, employees pay a fixed percentage of their paycheck based on the following salary schedules:\n\n\nCode\nlibrary(tidyverse)\nlibrary(dplyr)\nlibrary(ggplot2)\nlibrary(DT)\nlibrary(sf)\nlibrary(jsonlite)\nlibrary(httr2)\n\n\n\n\nCode\nTRSSalarySchedule &lt;- data.frame(\n  Salary_Range = c(\n    \"$45,000 or less\",\n    \"$45,001 to $55,000\",\n    \"$55,001 to $75,000\",\n    \"$75,001 to $100,000\",\n    \"$100,001 or more\"\n  ),\n  Contribution_Rate = c(\"3%\", \"3.5%\", \"4.5%\", \"5.75%\", \"6%\")\n)\n\ndatatable(setNames(TRSSalarySchedule, c(\"Salary Range\", \"Contribution Rate\")), caption = \"TRS Contribution Schedule\")\n\n\n\n\n\n\nIn this case, if a professor makes ~$60,000 a year, they can expect to contribute ~$2,700 yearly towards their TRS plan. As a professor continues receiving pay jumps, the amount they contribute towards their TRS increases and becomes a determining factor in how much their retirement benefit will be."
   },
   {
     "objectID": "mp04.html#calculating-retirement-benefit",
@@ -117,5 +117,12 @@
     "title": "Using Monte Carlo to Help CUNY Professors Retire",
     "section": "Contribution Schedule",
     "text": "Contribution Schedule\nUnder this plan, we expect the employee to contribute the same amount towards their retirement as a percent of their salary compared to TRS. On the flip side, CUNY contributes 8% of a professor’s total salary to their OPR for the first seven years of employment and 10% each year after."
+  },
+  {
+    "objectID": "mp04.html#investigating-correlations",
+    "href": "mp04.html#investigating-correlations",
+    "title": "Using Monte Carlo to Help CUNY Professors Retire",
+    "section": "Investigating Correlations",
+    "text": "Investigating Correlations"
   }
 ]
