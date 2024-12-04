@@ -1,0 +1,251 @@
+---
+title: "Using Monte Carlo to Help CUNY Professors Retire"
+editor: visual
+author: "Bleuuuz"
+---
+
+# Abstract
+
+I am conducting an analysis to support faculty members in planning for retirement. My work will focus on providing insights into the best approaches to retirement planning and investment strategies, empowering our dedicated educators to secure their financial futures.
+
+# Introduction
+
+As both a proud alumnus of [CUNY Baruch College](https://www.baruch.cuny.edu/) for my undergraduate degree in finance and a soon-to-be graduate in Quantitative Modeling, I’ve developed a quite deep connection to the school and the people behind it.
+
+What makes Baruch truly exceptional, are its dedicated faculty and staff. These individuals tirelessly commit their time and expertise to shaping the next generation of leaders, innovators, and change-makers who will influence the future.
+
+In recognition of their invaluable contributions, I am conducting an analysis to support faculty members in planning for retirement. My work will focus on providing insights into the best approaches to retirement planning and investment strategies, empowering our dedicated educators to secure their financial futures.
+
+## **CUNY Retirement Plans:**
+
+When a new professor is hired into the CUNY system, they must choose between a [CUNY-managed or Self-managed](https://www.cuny.edu/wp-content/uploads/sites/4/page-assets/about/administration/offices/hr/benefits/Benefits-Guide-Retirement-Plans-Final-HEO-and-ECP.pdf) retirement plan within their first 30 days. Although this seems like ample time to make a decision, for anyone without a finance of statistics background, approaching this situation can be quite a daunting task. (Even for those well versed in retirement planning!) CUNY colleges offer the following retirement options:
+
+### **1) The Teachers Retirement System Plan (TRS):**
+
+The TRS plan is a ["defined benefit"](https://www.investopedia.com/terms/d/definedbenefitpensionplan.asp) retirement plan that ensures professors receive guaranteed monthly income for life after they retire. To fund this plan, professors contribute a percentage of their paycheck which CUNY takes the responsibility of investing to meet the promised annuity payouts. Irrespective of investment performance, CUNY remains obligated to cover any shortfall if the investments underperform and cannot meet the promised annuity payouts. Conversely, if the investments exceed expectations, CUNY retains the surplus returns.
+
+## **Contribution Schedule**
+
+Under the TRS plan, employees pay a fixed percentage of their paycheck based on the following salary schedules:
+
+```{r message=FALSE,warning=FALSE}
+#| code-fold: true
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(DT)
+library(sf)
+library(jsonlite)
+library(httr2)
+```
+
+```{r message=FALSE,warning=FALSE}
+#| code-fold: true
+TRSSalarySchedule <- data.frame(
+  Salary_Range = c(
+    "$45,000 or less",
+    "$45,001 to $55,000",
+    "$55,001 to $75,000",
+    "$75,001 to $100,000",
+    "$100,001 or more"
+  ),
+  Contribution_Rate = c("3%", "3.5%", "4.5%", "5.75%", "6%")
+)
+
+datatable(setNames(TRSSalarySchedule, c("Salary Range", "Contribution Rate")), caption = "TRS Contribution Schedule")
+
+
+```
+
+In this case, if a professor makes \~\$60,000 a year, they can expect to contribute \~\$2,700 yearly towards their TRS plan. As a professor continues receiving pay jumps, the amount they contribute towards their TRS increases and becomes a determining factor in how much their retirement benefit will be.
+
+## **Calculating Retirement Benefit:**
+
+The retirement benefit a professor receives is calculated using a trailing 3-year Final Average Salary (FAS) of an employee and plugging it into the following formulas depending on number of years served (N):
+
+-   1.67% \* FAS \* N if N \<= 20
+
+-   1.75% \* FAS \* N if N = 20
+
+-   (35% + 2% \* N) \* FAS if N \>= 20
+
+As we can see, this benefit plan rewards those who worked longer at CUNY with a marginal increase of \$3,270 from 19 to 20 years and \$42,000 from 20 to 21 years of service everything else kept the same.
+
+```{r message=FALSE,warning=FALSE}
+#| code-fold: true
+FAS <- 100000
+YearsofService <- c(19, 20, 21)
+
+# Initialize an empty vector to store the benefit results
+benefits <- numeric(length(YearsofService))
+
+# Calculate the benefit based on years of service
+for (i in 1:length(YearsofService)) {
+  if (YearsofService[i] == 19) {
+    benefits[i] <- round(1.67 / 100 * FAS * YearsofService[i])
+  } else if (YearsofService[i] == 20) {
+    benefits[i] <- round(1.75 / 100 * FAS * YearsofService[i])
+  } else if (YearsofService[i] == 21) {
+    benefits[i] <- round((35 / 100 + 2 / 100 * YearsofService[i]) * FAS)
+  }
+}
+
+# Print the results
+agediff <- data.frame(YearsofService = YearsofService, Benefits = benefits)
+
+colnames(agediff) <- c("Years of Service", "Nominal Benefit ($)")
+
+datatable(agediff, options = list(pageLength = 5, autoWidth = TRUE), caption = "Difference in Nominal Benefit")
+
+
+
+
+```
+
+## **Accounting for Inflation:**
+
+The last part of this calculation takes into account the impact inflation may have on a retirees spending power. In order to match the rising cost of living, CUNY will increase retiree benefits annually by 50% of CPI rounded up to the nearest tenth percent with a minimum of 1% and max of 3% per year. As a result, if CPI comes in at 7% then the increase in a retirees benefit is 3% and if it comes in at 0% then the minimum 1%.
+
+In our case, the inflation adjustment kicks in every September and the CPI used is an aggregate monthly CPI of the previous 12 months.
+
+### **2) Optional Retirement Plan (OPR):**
+
+The OPR plan is similar to a [401k plan](https://www.investopedia.com/terms/1/401kplan.asp) offered by private employers where both the employee and employer make contributions that are invested at the employee's discretion. For our scenario, we will be assuming that professors will be following a constant [withdrawal rate of 4%](https://www.schwab.com/learn/story/beyond-4-rule-how-much-can-you-spend-retirement) a year and invest in a [Fidelity Freedom Fund](https://www.fidelity.com/mutual-funds/fidelity-fund-portfolios/freedom-funds) with the following allocations:
+
+```{r message=FALSE,warning=FALSE}
+#| code-fold: true
+AgeAllocation <- data.frame(
+  Age_Range = c(
+    "Age 25 to Age 49",
+    "Age 50 to Age 59",
+    "Age 60 to Age 74",
+    "Age 75 or older "
+  ),
+  US_Equities = c("54%", "47%", "34%", "19%"),
+  International_Equities = c("36%", "32%", "23%", "13%"),
+  Bonds = c("10%","21%","43%","62%"),
+  Short_TermDebt = c("0%","0%","0%","6%"))
+
+datatable(setNames(AgeAllocation, c("Age Range","US Equities","International Equities","Bonds","Short Term Debt")), caption = "Portfolio Allocation by Age" )
+  
+
+```
+
+## **Contribution Schedule**
+
+Under this plan, we expect the employee to contribute the same amount towards their retirement as a percent of their salary compared to TRS. On the flip side, CUNY contributes 8% of a professor's total salary to their OPR for the first seven years of employment and 10% each year after.
+
+# **Pulling in Data**
+
+Now that we've outlined our parameters for this investigation, we will be using API's to pull data from [AlphaVantage](https://www.alphavantage.co/) (Stock Market Data Provider) and [FRED](https://fred.stlouisfed.org/) (The Federal Reserve Economic Data Repository) for our analysis. To do this, we need to set up our API keys and functions to easily pull data.
+
+```{r message=FALSE,warning=FALSE}
+#| code-fold: true
+
+#Setting up our API keys 
+alphavantagedata <- function(symbol, api_key) {
+  # Construct the API URL
+  url <- paste0(
+    "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=",
+    symbol,
+    "&apikey=", api_key,
+    "&datatype=json"
+  )
+  
+  # Make the API request
+  response <- request(url) |> req_perform()
+  
+  # Parse the JSON response
+  data <- resp_body_json(response)[["Time Series (Daily)"]]
+  
+  # Check if data is available
+  if (is.null(data)) {
+    stop("Failed to retrieve time series data. Check your API key, symbol, and output size.")
+  }
+  
+  # Convert the data into a dataframe
+  df <- data.frame(
+    date = as.Date(names(data)),
+    adj_close = sapply(data, function(x) as.numeric(x[["4. close"]]))
+  )
+  
+  # Return the dataframe
+  return(df)
+}
+```
+
+```{r message=FALSE,warning=FALSE}
+#FRED Data Pull Function
+fred_data_pull <- function(series_id, api_key) {
+  
+  # Construct the URL for the API request
+  url <- paste0("https://api.stlouisfed.org/fred/series/observations?series_id=", 
+                series_id, 
+                "&api_key=", api_key, 
+                "&file_type=json")
+  
+  # Send request and parse the JSON response
+  response <- request(url) |> req_perform()
+  data <- fromJSON(response |> resp_body_string())
+  
+  # Check if data is available
+  if (is.null(data$observations)) stop("No observations found for series: ", series_id)
+  
+  # Convert to data frame and clean up the data
+  df <- data$observations |>
+    as.data.frame() |>
+    mutate(date = as.Date(date), value = as.numeric(value)) |>
+    filter(!is.na(value)) |>
+    select(date, value)
+  
+  return(df)
+}
+
+```
+
+**From AlphaVantage we need historical price charts for:**
+
+1\) [VTI-Vanguard Total Stock Market ETF](https://investor.vanguard.com/investment-products/etfs/profile/vti)
+
+2\) [VEU-Vanguard FTSE All-World ex-US Index Fund](https://investor.vanguard.com/investment-products/etfs/profile/veu)
+
+```{r message=FALSE,warning=FALSE}
+#| code-fold: true
+VTI_Data <- alpha_stock_data("VTI",alphavantagekey)
+VEU_Data <- alpha_stock_data("VEU",alphavantagekey)
+
+```
+
+**And from FRED we need:**
+
+1\) Wage Growth
+
+2\) Inflation Metrics
+
+3\) Bond Market Total Returns
+
+4\) Short-Term Debt Returns
+
+```{r message=FALSE,warning=FALSE}
+#| code-fold: true
+Wagegrowthdata <- fred_data_pull("CES0500000003", FREDkey) |>
+  rename(wage_growth_rate = value) 
+  
+inflation_data <- fred_data_pull("CPIAUCSL", FREDkey) |>
+  rename(inflation_rate = value)
+
+tenyeardata <- fred_data_pull('GS10', FREDkey) |>
+  mutate(month = format(date, "%Y-%m")) |>
+  group_by(month) |>
+  summarize(bond_return = last(value), .groups = 'drop') |>
+  mutate(date = as.Date(paste0(month, "-01"))) |>
+  select(date, bond_return)
+
+twoyeardata <- fred_data_pull('DTB3', FREDkey) |>
+  mutate(month = format(date, "%Y-%m")) |>
+  group_by(month) |>
+  summarize(short_term_rate = last(value), .groups = 'drop') |>
+  mutate(date = as.Date(paste0(month, "-01"))) |>
+  select(date, short_term_rate)
+  
+```
