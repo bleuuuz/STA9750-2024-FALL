@@ -1,0 +1,568 @@
+---
+title: "Socioeconomic Factors on Rat Population in NYC"
+editor: visual
+---
+
+# Abstract
+
+This study examines the relationship between rat sightings and socioeconomic factors in New York City. While a positive correlation was expected between unemployment rates and rat sightings, the analysis revealed a weak positive correlation, suggesting that other factors may be more influential. Additionally, no significant correlation was found between median income and rat sightings. These findings highlight the complex interplay of various factors in determining rat populations and emphasize the importance of addressing underlying issues such as sanitation, food availability, and urban planning to effectively mitigate rat infestations.
+
+# Table of Contents
+
+[I. Introduction](#introduction)
+
+[II. Loading Packages and Cleaning Data](#loading)
+
+[III. Investigation by Borough](#byborough)
+
+[IV. Analyzing Community Level Variation](#analyzing-community-level-variation)
+
+[V. Investigation by Community District](#investigation-by-community-district)
+
+[VI. Conclusion](#Conclusion)
+
+# I. Introduction {#introduction}
+
+Rats are an enduring and infamous feature of New York City’s urban landscape, symbolizing both its bustling vitality and its inherent challenges. With an estimated rat population rumored to rival that of the city’s own human inhabitants ([Which has been debunked thankfully](https://www.assuredenvironments.com/blog/new-york-and-rats-separating-fact-from-fiction/#:~:text=No.,8%2C550%2C405%20people%20living%20in%20NYC.)) these resilient rodents are deeply entrenched in NYC’s history and infrastructure. From subway tracks to alleyways and even upscale neighborhoods, rats have adapted to thrive in one of the world's most densely populated and fast-paced environments.
+
+The massive rat population in NYC highlights significant issues the city faces like waste management, urban planning, and public health which over the years the NYC has tried to address. Although the city has implemented various measures to control the rat population, ranging from [Carbon Monoxide](https://www.businessinsider.com/nyc-new-rat-killing-method-highly-successful-expanding-new-areas-2023-10) pumps to hiring a ["Rat Czar"](https://www.nyc.gov/office-of-the-mayor/news/249-23/mayor-adams-anoints-kathleen-corradi-nyc-s-first-ever-rat-czar-#/0), the persistence of the rat population underscores the complexity of addressing urban pest problems in a city as large as New York. Rather than implementing strategies throughout the entire city, it may be more cost effective and impactful to tackle more dense rat populations in specific areas. My analysis will explore the relationship between socioeconomic factors, including unemployment rates and median income, and the density of rat sightings in New York City.
+
+# II. Loading Packages & Cleaning Data {#loading}
+
+Before we start investigating, we need to load in the following packages to aid us in analyzing our data.
+
+```{r message=FALSE,warning=FALSE}
+#| code-fold: true
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(DT)
+library(sf)
+library(jsonlite)
+library(httr2)
+library(viridis)
+library(leaflet)
+library(stringr)
+library(plotly)
+```
+
+## Loading Data
+
+To begin my investigation, I theorized that areas with higher median incomes and employment would generally have lower rat populations due to better access to sanitation services and better-constructed infrastructure. Along with that, higher-income neighborhoods would also be able to afford to control rat infestations whereas their lower-income counterparts might not be able to. To test this theory, I downloaded historical [Unemployment Data](https://data.cccnewyork.org/data/download#0,8/0,85) and [Median Income Data](https://data.census.gov/table/ACSST1Y2023.S1903?q=S1903&g=160XX00US3651000) for NYC over the past 19 years. This data came from the [Census Bureau](https://www.census.gov/) which is a government agency that is highly reliable and without much bias. To track and analyze rat populations, I downloaded a [Rat Sightings](https://data.cityofnewyork.us/Social-Services/Rat-Sightings/3q43-55fe/data_preview) dataset from NYC Open Data.
+
+```{r message=FALSE,warning=FALSE}
+#| code-fold: true
+
+# Load Unemployment Data
+unemployment_data <- read.csv('Unemployment Rate.csv')
+
+# Load Income Data
+median_income_data <- read.csv("Median Incomes.csv")
+  
+# Rat Sightings Data
+rat_sighting <- read.csv("Rat_Sightings_20241209.csv")
+
+```
+
+## Cleaning Data
+
+[**Census Bureau: New York City Historical Unemployment Data**](https://data.cccnewyork.org/data/download#0,8/0,85)
+
+```{r message=FALSE,warning=FALSE}
+#| code-fold: true
+glimpse(unemployment_data)
+
+unemployment_data <- unemployment_data |>
+  mutate(Data = Data * 100)|>
+  rename(Unemployment_Rate = Data)|>
+  select(-DataFormat, -Fips)
+
+```
+
+To focus on the core variables of interest, the "DataFormat" and "Fips" columns were excluded from the unemployment dataset. Furthermore, the "Data" column, containing raw unemployment rates, was transformed into a percentage format by multiplying by 100 and renamed to "Unemployment Rate" for clarity and ease of interpretation later on.
+
+[**Census Bureau: New York City Historical Median Income Data**](https://data.census.gov/table/ACSST1Y2023.S1903?q=S1903&g=160XX00US3651000)
+
+```{r message=FALSE,warning=FALSE}
+#| code-fold: true
+
+glimpse(median_income_data)
+
+median_income_data <-median_income_data |>
+  rename(Median_Income = Data)|>
+  select(-DataFormat,-Fips)
+
+```
+
+The income data appears to be clean and ready for analysis, except for the 'DataFormat' and 'Fips' columns, which will be removed as they aren't needed for our investigation.
+
+[**Open NYC: Historical Rat Sightings**](https://data.cityofnewyork.us/Social-Services/Rat-Sightings/3q43-55fe/data_preview)
+
+```{r message=FALSE,warning=FALSE}
+#| code-fold: true
+
+rat_sighting <- rat_sighting |>
+  select(-"Agency.Name",
+         -"Agency",
+         -"Complaint.Type",
+         -"Descriptor",
+         -"Location.Type",
+         -"Incident.Address",
+         -"Cross.Street.1",
+         -"Cross.Street.2",
+         -"Intersection.Street.1",
+         -"Intersection.Street.2",
+         -"City",
+         -"Address.Type",
+         -"Landmark",
+         -"Facility.Type",
+         -"Status",
+         -"Due.Date",
+         -"Resolution.Action.Updated.Date",
+         -"Community.Board",
+         -"X.Coordinate..State.Plane.",
+         -"Y.Coordinate..State.Plane.",
+         -"Park.Facility.Name",
+         -"Park.Borough",
+         -"Vehicle.Type",
+         -"Taxi.Company.Borough",
+         -"Taxi.Pick.Up.Location",
+         -"Bridge.Highway.Name",
+         -"Bridge.Highway.Direction",
+         -"Road.Ramp",
+         -"Bridge.Highway.Segment",
+         -"Unique.Key",
+         -'Incident.Zip',
+         -"Street.Name",
+         -"Latitude",
+         -"Longitude")|>
+  mutate(Created_Date = mdy_hms(`Created.Date`)) |>  
+  filter(Created_Date >= as.Date("2019-01-01") & Created_Date <= as.Date("2023-12-31"))
+
+
+```
+
+Lastly, irrelevant columns were removed from the rat sightings data set and the 'Created_Date' column was formatted to allow filtering for the past four years, as agreed upon by my colleagues. (I spared you scrolling through what a glimpse of this dataframe looked like)
+
+# III. Investigation by Borough: {#byborough}
+
+Now that the data has been cleaned, we can join our tables to create a borough-level overview of unemployment rates and median incomes against the number of rat sightings per borough. For this scenario, we are creating an average median income from 2019-2024 to match with our Rat sightings data that encompasses sightings over that period.
+
+```{r message=FALSE,warning=FALSE}
+#| code-fold: true
+
+# Summarizing sightings per borough
+sightings_per_borough <- rat_sighting |>
+  group_by(Borough) |>
+  summarize(Sightings = n(), .groups = "drop") |>
+  mutate(Location = str_to_title(tolower(Borough))) |>
+  filter(Location %in% c("Manhattan", "Bronx", "Brooklyn", "Staten Island", "Queens")) |>
+  select(-Borough)
+
+# Creating an average median income for 2019-2024 period
+income_per_borough <- median_income_data |>
+  filter(TimeFrame >= 2019 & TimeFrame <= 2024) |>
+  group_by(Location) |>
+  summarize(Median_Income = mean(Median_Income), .groups = "drop") |>
+  filter(Location %in% c("Manhattan", "Bronx", "Brooklyn", "Staten Island", "Queens"))
+
+# Creating an average unemployment rate for 2019-2024 period
+unemployment_per_borough <- unemployment_data |>
+  filter(TimeFrame >= 2019 & TimeFrame <= 2024) |>
+  group_by(Location) |>
+  summarize(Unemployment_Rate = mean(Unemployment_Rate), .groups = "drop") |>
+  filter(Location %in% c("Manhattan", "Bronx", "Brooklyn", "Staten Island", "Queens"))
+
+# Joining tables for visualizations
+sighting_income <- left_join(sightings_per_borough, income_per_borough, by = "Location")
+
+sighting_unemployment <- left_join(sightings_per_borough,unemployment_per_borough, by = "Location")
+
+```
+
+**Rat Sightings vs Median Income by Borough**
+
+```{r message=FALSE,warning=FALSE}
+#| code-fold: true
+
+
+# Graph displaying income v sightings based on borough
+sighting_income_graph <- ggplot(sighting_income, aes(x = Median_Income, y = Sightings, color = Location)) +
+  geom_point(size = 3) +
+  geom_text(aes(label = Location), hjust = 0, vjust = -0.5, size = 3) +
+  labs(x = "Median Income", y = "Number of Sightings", title = "Rat Sightings vs. Median Income") +
+  theme_minimal() +
+  theme(text = element_text(size = 12))
+
+
+sighting_income_graph
+
+```
+
+**Overall Trend**
+
+Despite significant differences in median income, particularly between The Bronx and Manhattan, the number of rat sightings does not appear to be strongly correlated with income levels. In fact, three of the four boroughs with substantially higher median income have equal or greater numbers of rat sightings compared with The Bronx. This evidence suggests that at a borough level, median income has little to no correlation with rat sightings.
+
+To confirm this, a correlation between the two returns -0.190. This suggests that, generally, as unemployment rates increase, there may be a slight increase in rat sightings, but other factors may also be influencing this relationship.
+
+```{r}
+# Correlation between Sightings and Median Income
+sighting_income_cor <- cor(sighting_income$Sightings, sighting_income$Median_Income)
+
+print(sighting_income_cor)
+```
+
+**Rat Sightings vs Unemployment Rate by Borough**
+
+```{r message=FALSE,warning=FALSE}
+#| code-fold: true
+
+# Graph displaying unemployment v sightings based on borough
+sighting_unemployment_graph <- ggplot(sighting_unemployment, aes(x = Unemployment_Rate, y = Sightings, color = Location)) +
+  geom_point(size = 3) +
+  geom_text(aes(label = Location), hjust = 0, vjust = -0.5, size = 3) +
+  labs(x = "Unemployment Rate", y = "Number of Sightings", title = "Rat Sightings vs. Unemployment Rate") +
+  theme_minimal() +
+  theme(text = element_text(size = 12))
+
+sighting_unemployment_graph
+```
+
+**Overall Trend**
+
+Similarly, there also appears to be a weak correlation between unemployment rates and rat sightings. For instance, boroughs like Brooklyn, Manhattan, and Queens, which all have similar unemployment rates, exhibit vastly different rat sighting numbers.
+
+To confirm this, a correlation between the two yields 0.213. This suggests that, generally, as unemployment rates increase, there may be a slight increase in rat sightings, but other factors may also be influencing this relationship.
+
+```{r}
+# Correlation between Sightings and Unemployment
+sighting_unemployment_cor <- cor(sighting_unemployment$Sightings, sighting_unemployment$Unemployment_Rate)
+
+print(sighting_unemployment_cor)
+```
+
+**Conclusion**
+
+At the borough level, our analysis suggests that income and unemployment alone do not fully explain the variations in rat populations. This may be due to the oversimplification of considering entire boroughs as homogeneous units which can potentially mask localized differences within each borough.
+
+# IV. Analyzing Community Level Variation {#analyzing-community-level-variation}
+
+Although our analysis at a borough level proved inconclusive, we can delve further into our data to see if our theory garners some merit on a more granular level. To do this, instead of looking at boroughs, we can look at [Community District Tabulation Areas](https://www.nyc.gov/site/planning/planning-level/nyc-population/nyc-population-terms-definitions.page) which are administrative districts created to approximate New York City's 59 community districts.
+
+**Filtering for our Community District Tabulation Areas**
+
+To focus on specific CDTA regions, we'll remove broader geographic areas like New York City and the five boroughs from the dataset. Following that, we will also reshape the data using the `pivot_wider` function to make visualizations more easily.
+
+```{r message=FALSE,warning=FALSE}
+#| code-fold: true
+
+# Filters out NYC and Boroughs from Unemployment Data
+unemployment_region <- unemployment_data |>
+  filter(
+    !(Location %in% c("New York City", "Manhattan", "Bronx", "Brooklyn", "Staten Island", "Queens"))
+  ) 
+
+# Reshape unemployment dataframe to wide format 
+unemployment_wide <- unemployment_region |>
+  mutate(Year = str_extract(TimeFrame, "\\d{4}")) |>
+  pivot_wider(names_from = Year, values_from = Unemployment_Rate) |> 
+  select(-TimeFrame) |> 
+  group_by(Location) |> 
+  summarise(across(
+    everything(),
+    ~ if (is.numeric(.)) sum(., na.rm = TRUE) else first(.), 
+    .names = "{.col}" 
+  ))
+  
+# Filters out NYC and Boroughs from Income Data
+
+median_income_region <-median_income_data |>
+  filter(
+    !(Location %in% c("New York City", "Manhattan", "Bronx", "Brooklyn", "Staten Island", "Queens"))
+  ) 
+
+# Reshape unemployment dataframe to wide format 
+median_income_wide <- median_income_region |>
+  mutate(Year = str_extract(TimeFrame, "\\d{4}")) |>
+  pivot_wider(names_from = Year, values_from = Median_Income) |> 
+  select(-TimeFrame) |> 
+  group_by(Location) |> 
+  summarise(across(
+    everything(),
+    ~ if (is.numeric(.)) sum(., na.rm = TRUE) else first(.), 
+    .names = "{.col}" 
+  ))
+```
+
+**Downloading and Cleaning CDTA Shapefiles**
+
+To visualize the data at the CDTA level, we'll download shapefiles for New York City and merge them with our restructured wide datasets. This will allow us to create interactive map visualizations.
+
+```{r message=FALSE,warning=FALSE}
+#| code-fold: true
+
+# Load NYC CDTA Shapefiles
+nyc_shapefile <- st_read(
+  "C:/Users/elija/OneDrive - The City University of New York/Documents/STA9750-2024-FALL/nycdta2020.shp",
+  quiet = TRUE
+)
+
+# Check and Set CRS (if missing)
+if (is.na(st_crs(nyc_shapefile))) {
+  nyc_shapefile <- st_set_crs(nyc_shapefile, 4269) # Set to NAD83 CRS if undefined
+}
+
+# Reproject to WGS84 (Longitude-Latitude)
+nyc_shapefile_wgs84 <- st_transform(nyc_shapefile, crs = 4326)
+
+
+# Create column to join with unemployment data
+nyc_shapefile_wgs84 <- nyc_shapefile_wgs84 |>
+  mutate(CDTAName = str_sub(CDTAName, 6)) |>
+  rename(Location = CDTAName)
+
+# Join data with shapefiles
+unemployment_map <- left_join(nyc_shapefile_wgs84, unemployment_wide, by = "Location")
+
+income_map <- left_join(nyc_shapefile_wgs84, median_income_wide, by = "Location")
+
+```
+
+**2021 Median Income by Community District Tabulation Areas**
+
+This map visually represents the median income rate across CDTA's in New York City in 2021.
+
+```{r message=FALSE,warning=FALSE}
+#| code-fold: true
+
+
+# Create the interactive map
+leaflet(income_map) |>
+  addTiles() |> 
+  addPolygons(
+    fillColor = ~colorNumeric(palette = "Greens", domain = income_map$`2021`)(`2021`),
+    weight = 1,
+    opacity = 1,
+    color = "white",
+    fillOpacity = 0.7,
+    popup = ~paste(
+      "<b>Location:</b>", Location, "<br>",
+      "<b>Median Income ($) (2021):</b>", `2021`
+    )
+  ) |>
+  addLegend(
+    pal = colorNumeric(palette = "Greens", domain = income_map$`2021`),
+    values = ~`2021`,
+    title = "Median Income ($) (2021)",
+    position = "bottomright"
+  )
+```
+
+**Overall Trend**
+
+As shown by our interactive map, a significant degree of variation in median income exists within select boroughs like [Manhattan](https://en.wikipedia.org/wiki/Manhattan) and [Brooklyn](https://en.wikipedia.org/wiki/Brooklyn), which likely contributed to the lack of correlation between borough-level median income and rat sightings. Areas like the Mid-Lower parts of Manhattan and eastern parts of Brooklyn and [Queens](https://en.wikipedia.org/wiki/Queens) appear to have higher median income compared to areas like the [Bronx](https://en.wikipedia.org/wiki/The_Bronx).
+
+Based on this, we'd expect our borough-level analysis to be less accurate for higher variation income boroughs like Manhattan in comparison to more homogeneous lower income variance boroughs like The Bronx.
+
+**2021 Median Income Distribution** **by Community District Tabulation Areas**
+
+To fact-check our previous inference, I created an income distribution for each borough and was surprised at what I found.
+
+1\) Brooklyn has less overall income variation compared to the rest of the boroughs despite having a much larger range and appearing to have more variation
+
+2\) [Staten Island](https://en.wikipedia.org/wiki/Staten_Island) is not as homogeneous as it looks on the interactive map, there is quite a tail reaching towards the lower income side of the distribution.
+
+```{r message=FALSE,warning=FALSE}
+#| code-fold: true
+
+# Drop geometry and location
+income_map_no_geom <- st_drop_geometry(income_map)|>
+  select(-Location)
+
+income_distribution <-ggplot(income_map_no_geom, aes(x = `2021`, fill = BoroName)) +
+  geom_density(alpha = 0.5) +
+  facet_wrap(~ BoroName, scales = "free_y") +
+  labs(x = "Income", y = "Density", title = "New York City Income Distribution by Borough in 2021")
+
+income_distribution
+```
+
+**2021 Unemployment Rates by Community District Tabulation Areas**
+
+This map visually represents the unemployment rate across CBTAs in New York City in 2021.
+
+```{r message=FALSE,warning=FALSE}
+#| code-fold: true
+
+# Create the interactive map
+leaflet(unemployment_map) |>
+  addTiles() |> 
+  addPolygons(
+    fillColor = ~colorNumeric(palette = "YlOrRd", domain = unemployment_map$`2021`)(`2021`),
+    weight = 1,
+    opacity = 1,
+    color = "white",
+    fillOpacity = 0.7,
+    popup = ~paste(
+      "<b>Location:</b>", Location, "<br>",
+      "<b>Unemployment Rate (2021):</b>", `2021`
+    )
+  ) |>
+  addLegend(
+    pal = colorNumeric(palette = "YlOrRd", domain = unemployment_map$`2021`),
+    values = ~`2021`,
+    title = "Unemployment Rate in % (2021)",
+    position = "bottomright"
+  )
+```
+
+**Overall Trend**
+
+Much like the variation in income distribution we saw in our prior map, we can also see a significant degree of variation in unemployment rates across different neighborhoods. Certain areas, particularly in the Bronx, and some parts of Brooklyn in Queens like [Ocean-Hill](https://en.wikipedia.org/wiki/Ocean_Hill,_Brooklyn) and [Jamaica](https://en.wikipedia.org/wiki/Jamaica,_Queens), appear to have higher unemployment rates compared to areas like the [Financial District](https://en.wikipedia.org/wiki/Financial_District,_Manhattan).
+
+**2021 Unemployment Rate Distribution by Community District Tabulation Areas**
+
+Despite the spatial variation in unemployment rates across New York City's boroughs, the distribution of rates is surprisingly tighter than expected, except for Manhattan, which exhibits the most variation.
+
+```{r message=FALSE,warning=FALSE}
+#| code-fold: true
+
+# Drop geometry and location
+unemployment_map_no_geom <- st_drop_geometry(unemployment_map)|>
+  select(-Location)
+
+income_distribution <-ggplot(unemployment_map_no_geom, aes(x = `2021`, fill = BoroName)) +
+  geom_density(alpha = 0.5) +
+  facet_wrap(~ BoroName, scales = "free_y") +
+  labs(x = "Unemployment Rate", y = "Density", title = "New York City Unemployment Rate Distribution by Borough in 2021")
+
+income_distribution
+```
+
+**2021 Rat Map by Community District Tabulation Areas**
+
+This map visually represents the distribution of rat sightings across New York City in 2021.
+
+```{r message=FALSE,warning=FALSE}
+#| code-fold: true
+
+Rat_sighting_filtered <- rat_sighting %>%
+  group_by(CDTAName) %>%
+  summarise(Total_Count = n())|>
+  rename(Location = CDTAName)|>
+  rename(Sightings = Total_Count)
+
+
+sighting_income_region_graph <- left_join(income_map, Rat_sighting_filtered, by = "Location")
+
+leaflet(sighting_income_region_graph) |>
+  addTiles() |> 
+  addPolygons(
+    fillColor = ~colorNumeric(palette = "YlOrRd", domain = sighting_income_region_graph$`Sightings`)(`Sightings`),
+    weight = 1,
+    opacity = 1,
+    color = "white",
+    fillOpacity = 0.7,
+    popup = ~paste(
+      "<b>Location:</b>", Location, "<br>",
+      "<b>Unemployment Rate (2021):</b>", `Sightings`
+    )
+  ) |>
+  addLegend(
+    pal = colorNumeric(palette = "YlOrRd", domain = sighting_income_region_graph$`Sightings`),
+    values = ~`Sightings`,
+    title = "Rat Sightings (2021)",
+    position = "bottomright"
+  )
+
+```
+
+**Overall Trend**
+
+Lastly, if we take a look at our newly reorganized rat map, we can see that there are superclusters of rats in certain neighborhoods like [Williamsburg](https://en.wikipedia.org/wiki/Williamsburg,_Brooklyn), [Bedford](https://en.wikipedia.org/wiki/Bedford%E2%80%93Stuyvesant,_Brooklyn), and the [Upper West Side](https://en.wikipedia.org/wiki/Upper_West_Side).
+
+Although this provides evidence that generally more densely populated areas have higher numbers of sightings, it also begs the question of whether or not all sightings are being reported. I, like many others, often see rats on my daily commute but have never reported them.
+
+# V. Investigation by Community District {#investigation-by-community-district}
+
+By sorting our data at a Community District level, we anticipate a more accurate and nuanced correlation between the data sets, as this will enable us to take into account and identify localized variations between neighborhoods.
+
+**Rat Sightings vs Median Income by Community District**
+
+```{r message=FALSE,warning=FALSE}
+#| code-fold: true
+
+# Create the base ggplot2 plot with a linear regression line
+sighting_income_region_visual <- ggplot(sighting_income_region_graph, aes(x = `2021`, y = Sightings, color = Location)) +
+  geom_point(alpha = 0.7) +  # Semi-transparent points
+  labs(x = "Median Income", y = "Number of Sightings", title = "Rat Sightings vs. Median Income") +
+  theme(legend.position = "none")
+
+# Convert to an interactive plotly plot
+ggplotly(sighting_income_region_visual, tooltip = c("Location", "Sightings"))
+```
+
+**Overall Trend**
+
+Despite increasing the number of available data points by using more granular data, our data chart still shows no clear correlation between rat sightings and median income. The data is scattered across the plot indicating that higher-income areas don't necessarily have fewer rat sightings.
+
+**Correlation Analysis**
+
+To further this point, even if we remove outlier rat sightings data points where rat sightings are over 12,000 for a specific region, our correlation comes out 0.0085 which falls below our borough-level correlation analysis of -0.19.
+
+```{r}
+income_sightings_region_cor <- sighting_income_region_graph |>
+  filter(!is.na(Sightings), Sightings <= 12000) |>
+  select(Location, `2021`, Sightings)
+
+correlation_coefficient <- cor(income_sightings_region_cor$Sightings, income_sightings_region_cor$`2021`)
+
+print(correlation_coefficient)
+  
+```
+
+**Rat Sightings vs Unemployment Rate by Community District**
+
+```{r}
+
+sighting_unemployment_region_graph <- left_join(unemployment_map, Rat_sighting_filtered, by = "Location")
+
+# Create the base ggplot2 plot
+sighting_unemployment_region_visual <- ggplot(sighting_unemployment_region_graph, aes(x = `2021`, y = Sightings, color = Location, text = Location)) +
+  geom_point() +
+  labs(x = "Unemployment_Rate", y = "Number of Sightings", title = "Rat Sightings vs. Unemployment Rate") +
+  theme(legend.position = "none")
+
+# Convert to an interactive plotly plot
+ggplotly(sighting_unemployment_region_visual, tooltip = c("Location", "Sightings"))
+```
+
+**Overall Trend**
+
+Much like our median income chart, there seems to be no strong correlation between the number of rat sightings and unemployment rates. The data points are once again scattered across the plot with a few notable outliers that were the same regions in both median income/unemployment charts. (Which makes sense because higher unemployment results in lower median incomes)
+
+**Correlation Analysis**
+
+After conducting correlation analysis and removing outlier rat sightings data points, our correlation comes out 0.149 which falls below our borough-level correlation analysis of 0.21. Although our correlation is weaker than it was before, it does indicate that there is a weak positive correlation between unemployment rates and rat sightings.
+
+```{r}
+unemployment_sightings_region_cor <- sighting_unemployment_region_graph |>
+  filter(!is.na(Sightings), Sightings <= 12000) |>
+  select(Location, `2021`, Sightings)
+
+unemp_correlation_coefficient <- cor(unemployment_sightings_region_cor$Sightings, unemployment_sightings_region_cor$`2021`)
+
+print(unemp_correlation_coefficient)
+```
+
+# VI. Conclusion {#Conclusion}
+
+My analysis of the relationship between rat sightings and both median income and unemployment rates in New York City has yielded some interesting insights. While I expected a stronger correlation between these socioeconomic factors and rat populations, the data suggests a more complex relationship.
+
+**Key Findings:**
+
+-   **Weak Correlation:** Despite increasing the granularity of our analysis to the Community District level, we found a weak positive correlation between unemployment rates and rat sightings. This correlation is weaker than the one observed at the borough level.
+
+-   **No Clear Correlation with Income:** I did not find a significant correlation between median income and rat sightings, even after filtering out outliers. The data points were scattered across the plot, suggesting that income is not a primary driver of rat populations.
+
+Although there may be some relationship between unemployment rates and rat sightings, these findings suggest that other factors, such as sanitation practices, food availability, and urban density, may play a more significant role in determining rat populations.
